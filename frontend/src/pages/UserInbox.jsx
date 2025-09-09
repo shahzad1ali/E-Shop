@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { AiOutlineArrowRight, AiOutlineSend } from "react-icons/ai";
 import { TfiGallery } from "react-icons/tfi";
 import styles from "../styles/style";
+//Socket io
 const ENDPOINT = "https://e-shop-socket-server.onrender.com/";
 const socketId = socketIO(ENDPOINT, { transports: ["websocket"] });
 
