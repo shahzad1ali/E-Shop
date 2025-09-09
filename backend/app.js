@@ -15,7 +15,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Enable CORS for frontend
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    // origin: "http://localhost:3000",
+    origin: "https://e-shop-62ai.vercel.app/",
     credentials: true,
   })
 );
