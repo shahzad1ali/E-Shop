@@ -16,15 +16,15 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
   cors({
     // origin: "http://localhost:3000",
-    origin: "https://e-shop-62ai.vercel.app/",
+    origin: "https://e-shop-62ai.vercel.app",
     credentials: true,
   })
 );
 
 // ✅ Serve uploads folder correctly (outside backend)
-app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
-app.use("/", (req,res) => {
-  res.send("test Api");
+app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
+app.use("/test", (req,res) => {
+  res.send("backend Api");
 });
 
 
