@@ -317,7 +317,7 @@ const SellerInbox = ({
     <div className="w-full flex p-3 items-center justify-between bg-[#0000002c]">
       <div className="flex">
         <img
-          src="http://localhost:8000/uploads/shoes_1756707286260_979186652.jpg"
+          src={`${backend_url}/uploads/shoes_1756707286260_979186652.jpg`}
           alt=""
           className="rounded-full w-[60px] h-[60px]"
         />
@@ -346,7 +346,7 @@ const SellerInbox = ({
             >
               {item.sender !== sellerId && (
                 <img
-                  src="http://localhost:8000/uploads/shoes_1756707286260_979186652.jpg"
+                  src={`${backend_url}/uploads/shoes_1756707286260_979186652.jpg`}
                   alt=""
                   className="w-[40px] h-[40px] rounded-full mr-3"
                 />
