@@ -1,18 +1,16 @@
 const app = require("./app");
 const connectDB = require("./db/dataBase");
 const path = require("path");
-const cloudinary = require("cloudinary").v2;
+const cloudinary = require("cloudinary");
 require("dotenv").config({
   path: "config/.env",
 });
 
 // ✅ Serve uploads folder outside backend
-const uploadsPath = path.resolve(__dirname, "../uploads");
-app.use("/uploads", require("express").static(uploadsPath));
-
-
-// ✅ Debug: confirm uploads path
-console.log("Uploads served at:", uploadsPath);
+// const uploadsPath = path.resolve(__dirname, "../uploads");
+// app.use("/uploads", require("express").static(uploadsPath));
+// // ✅ Debug: confirm uploads path
+// console.log("Uploads served at:", uploadsPath);
 
 // Handling uncaught exceptions
 process.on("uncaughtException", (err) => {

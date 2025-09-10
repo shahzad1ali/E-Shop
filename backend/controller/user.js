@@ -1,31 +1,37 @@
 const express = require("express");
-const { upload } = require("../multer");
 const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const catchAsyncError = require("../middleware/catchAsyncError");
 const sendToken = require("../utils/jwtToken");
 const router = express.Router();
-const cloudinary = require("cloudinary").v2;
 
 const User = require("../model/user");
 const ErrorHandler = require("../utils/ErrorHandler");
 const sendMail = require("../utils/sendMail");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 
-// // Create a user
-router.post("/create-user", async (req, resp, next) => {
-  try {
-    const { name, email, password, avatar } = req.body; // avatar = base64 string
+const { upload } = require("../multer");
+const cloudinary = require("../config/cloudinary"); // ✅ now correct
 
-    // check if user exists
-    const userEmail = await User.findOne({ email });
-    if (userEmail) {
-      return next(new ErrorHandler("User already exists", 400));
+router.post("/create-user", upload.single("file"), async (req, resp, next) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return next(new ErrorHandler("Please provide all fields", 400));
     }
 
-    // upload avatar to cloudinary
-    const myCloud = await cloudinary.uploader.upload(avatar, {
+    if (!req.file) {
+      return next(new ErrorHandler("No file uploaded", 400));
+    }
+
+    // Convert file buffer to base64
+    const base64 = req.file.buffer.toString("base64");
+    const dataUri = `data:${req.file.mimetype};base64,${base64}`;
+
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(dataUri, {
       folder: "avatars",
     });
 
@@ -34,8 +40,8 @@ router.post("/create-user", async (req, resp, next) => {
       email,
       password,
       avatar: {
-        public_id: myCloud.public_id,
-        url: myCloud.secure_url,
+        public_id: result.public_id,
+        url: result.secure_url,
       },
     };
 
@@ -56,6 +62,9 @@ router.post("/create-user", async (req, resp, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
+
+
 
 
 // router.post("/create-user", upload.single("file"), async (req, resp, next) => {
@@ -139,70 +148,11 @@ router.post("/create-user", async (req, resp, next) => {
 //   }
 // });
 
-// router.post("/create-user",upload.single("file"), async (req,res,next)=>{
-
-//     const filename = req?.file?.filename;
-//     console.log(filename);
-//     const {name,email,password} = req.body;
-//     const userEmail = await User.findOne({email});
-
-//     if (userEmail) {
-//         const filename = req.file.filename;
-//         const filePath = path.join(__dirname, `../uploads/${filename}`);
-//         fs.unlink(filePath, (err) => {
-//             if (err) {
-//                 console.log(err);
-//                 res.status(500).json({ message: "Error deleting file" })
-//             }
-
-//         });
-//         return next(new ErrorHandler("user already exist", 400));
-//     }
-   
-//     // // const fileUrl = path.join(filename);
-//     // const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
-//     // console.log(fileUrl)
-
-//     const myCloud = await cloudinary.v2.uploader.upload(avatar, {
-//         folder: "avatars",
-//     })
-
-
-//     const user = {
-//         name: name,
-//         email: email,
-//         password: password,
-//         avatar: {
-//           public_id: myCloud.public_id,
-//           url: myCloud.secure_url,
-//         },
-//     //     avatar:{
-//     //         url:fileUrl
-//     // }
-//   }
-
-//     const activationToken = createActivationToken(user);
-
-//         const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
-
-//         try {
-//             await sendMail({
-//                 email: user.email,
-//                 subject:"Activate your account",
-//                 message:`Hello ${user.name}, Please click on the link to activate your account: ${activationUrl}`,
-//             })
-//             res.status(201).json({
-//                 success: true,
-//                 message: `please check your email:- ${user.email} to active your account`
-//             })
-//         } catch (error) {
-//             return next(new ErrorHandler(error.message, 500));
-         
-//         }
-//         });
 
 
 // CREATE ACTIVATION TOKEN
+
+
 const createActivationToken = (user) => {
   return jwt.sign(
     {
