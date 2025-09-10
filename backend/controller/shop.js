@@ -12,7 +12,7 @@ const { upload } = require("../multer");
 const catchAsyncError = require("../middleware/catchAsyncError");
 const sendShopToken = require("../utils/shopToken");
 
-// CREATE SHOP
+// Create shop
 router.post(
   "/create-shop",
   upload.single("avatar"),
@@ -37,7 +37,6 @@ router.post(
               `⚠️ Failed to delete file (${filename}):`,
               err.message
             );
-            // Optional: Don't block user creation just because of file deletion failure
           }
         } else {
           console.warn("⚠️ No file found to delete.");
@@ -192,6 +191,8 @@ router.get(
       resp.cookie("seller_token", null, {
         expires: new Date(Date.now()),
         httpOnly: true,
+         sameSite: "none",
+         secure: true,
       });
       resp.status(201).json({
         success: true,

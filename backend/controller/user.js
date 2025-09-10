@@ -13,7 +13,7 @@ const ErrorHandler = require("../utils/ErrorHandler");
 const sendMail = require("../utils/sendMail");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 
-// CREATE A USER
+// Create a user
 router.post("/create-user", upload.single("file"), async (req, resp, next) => {
   try {
     console.log("REQ.BODY:", req.body);
@@ -58,6 +58,7 @@ router.post("/create-user", upload.single("file"), async (req, resp, next) => {
 
     const activationToken = createActivationToken(user);
     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+    
 
     await sendMail({
       email: user.email,
@@ -189,6 +190,9 @@ router.get(
       resp.cookie("token", null, {
         expires: new Date(Date.now()),
         httpOnly: true,
+         sameSite: "none",
+         secure: true,
+        
       });
       resp.status(201).json({
         success: true,
