@@ -13,7 +13,7 @@ const EventCard = ({ active, data }) => {
 
   if (!data) return null; 
     const imageUrl = data?.images?.[0]
-  ? `${backend_url}${data.images?.[0]}`
+  ? `${data.images?.[0]?.url}`
   : "";
 
   const addToCartHandler = (data) => {

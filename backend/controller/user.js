@@ -5,7 +5,7 @@ const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const catchAsyncError = require("../middleware/catchAsyncError");
 const sendToken = require("../utils/jwtToken");
-
+const cloudinary = require("cloudinary");
 const router = express.Router();
 
 const User = require("../model/user");
@@ -95,16 +95,27 @@ router.post("/create-user",upload.single("file"), async (req,res,next)=>{
         return next(new ErrorHandler("user already exist", 400));
     }
    
-    // const fileUrl = path.join(filename);
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
-    console.log(fileUrl)
+    // // const fileUrl = path.join(filename);
+    // const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
+    // console.log(fileUrl)
+
+    const myCloud = await cloudinary.v2.uploader.upload(avatar, {
+        folder: "avatars",
+    })
+
+
     const user = {
         name: name,
         email: email,
         password: password,
-        avatar:{
-            url:fileUrl
-    }}
+        avatar: {
+          public_id: myCloud.public_id,
+          url: myCloud.secure_url,
+        },
+    //     avatar:{
+    //         url:fileUrl
+    // }
+  }
 
     const activationToken = createActivationToken(user);
 
@@ -190,7 +201,7 @@ router.post(
     try {
       const { email, password } = req.body;
       if (!email || !password) {
-        return next(new ErrorHandler("Please provide all feilda", 400));
+        return next(new ErrorHandler("Please provide all feilda", 404));
       }
       const user = await User.findOne({ email }).select("+password");
       if (!user) {
@@ -281,7 +292,7 @@ router.put(
 
       await user.save();
 
-      res.status(201).json({
+      res.status(200).json({
         success: true,
         user,
       });
