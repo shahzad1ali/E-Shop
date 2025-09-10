@@ -14,92 +14,51 @@ const sendMail = require("../utils/sendMail");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 
 // // Create a user
-// router.post("/create-user", upload.single("file"), async (req, resp, next) => {
-//   try {
-//     console.log("REQ.BODY:", req.body);
-//     console.log("REQ.FILE:", req.file);
-//     const filename = req.file?.filename;
-//     console.log("upload file", filename);
+router.post("/create-user", upload.single("file"), async (req, resp, next) => {
+  try {
+    console.log("REQ.BODY:", req.body);
+    console.log("REQ.FILE:", req.file);
+    const filename = req.file?.filename;
+    console.log("upload file", filename);
 
-//     const { name, email, password } = req.body;
-//     const userEmail = await User.findOne({ email });
-
-//     if (userEmail) {
-//       const filename = req.file?.filename;
-
-//       if (filename) {
-//         const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
-//           req.file.filename
-//         }`;
-
-//         try {
-//           // Try to delete the uploaded file
-//           await fs.promises.unlink(filePath);
-//           console.log(`✅ Deleted file: ${filename}`);
-//         } catch (err) {
-//           console.error(`⚠️ Failed to delete file (${filename}):`, err.message);
-//         }
-//       } else {
-//         console.warn("⚠️ No file found to delete.");
-//       }
-
-//       return next(new ErrorHandler("User already exists", 400));
-//     }
-
-//     const fileUrl = path.join("uploads", req.file.filename);
-//     const user = {
-//       name,
-//       email,
-//       password,
-//       avatar: {
-//         url: fileUrl,
-//       },
-//     };
-
-//     const activationToken = createActivationToken(user);
-//     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
-    
-
-//     await sendMail({
-//       email: user.email,
-//       subject: "Activate your account",
-//       message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
-//     });
-
-//     resp.status(201).json({
-//       success: true,
-//       message: `Please check your email (${user.email}) to activate your account.`,
-//     });
-//   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
-
-router.post("/create-user",upload.single("file"), async (req,res,next)=>{
-
-    const filename = req?.file?.filename;
-    console.log(filename);
-    const {name,email,password} = req.body;
-    const userEmail = await User.findOne({email});
+    const { name, email, password } = req.body;
+    const userEmail = await User.findOne({ email });
 
     if (userEmail) {
-        const filename = req.file.filename;
-        const filePath = path.join(__dirname, `../uploads/${filename}`);
-        fs.unlink(filePath, (err) => {
-            if (err) {
-                console.log(err);
-                res.status(500).json({ message: "Error deleting file" })
-            }
+      const filename = req.file?.filename;
 
-        });
-        return next(new ErrorHandler("user already exist", 400));
+      if (filename) {
+        const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
+          req.file.filename
+        }`;
+
+        try {
+          // Try to delete the uploaded file
+          await fs.promises.unlink(filePath);
+          console.log(`✅ Deleted file: ${filename}`);
+        } catch (err) {
+          console.error(`⚠️ Failed to delete file (${filename}):`, err.message);
+        }
+      } else {
+        console.warn("⚠️ No file found to delete.");
+      }
+
+      return next(new ErrorHandler("User already exists", 400));
     }
-   
-    // // const fileUrl = path.join(filename);
-    // const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
-    // console.log(fileUrl)
 
-    const myCloud = await cloudinary.v2.uploader.upload(avatar, {
+    // const fileUrl = path.join("uploads", req.file.filename);
+    
+
+    // const user = {
+    //   name,
+    //   email,
+    //   password,
+    //   avatar: {
+    //     url: fileUrl,
+    //   },
+    // };
+    
+     const myCloud = await cloudinary.v2.uploader.upload(avatar, {
         folder: "avatars",
     })
 
@@ -109,7 +68,7 @@ router.post("/create-user",upload.single("file"), async (req,res,next)=>{
         email: email,
         password: password,
         avatar: {
-          public_id: myCloud.public_id,
+          // public_id: myCloud.public_id,
           url: myCloud.secure_url,
         },
     //     avatar:{
@@ -118,24 +77,85 @@ router.post("/create-user",upload.single("file"), async (req,res,next)=>{
   }
 
     const activationToken = createActivationToken(user);
+    const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+    
 
-        const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+    await sendMail({
+      email: user.email,
+      subject: "Activate your account",
+      message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
+    });
 
-        try {
-            await sendMail({
-                email: user.email,
-                subject:"Activate your account",
-                message:`Hello ${user.name}, Please click on the link to activate your account: ${activationUrl}`,
-            })
-            res.status(201).json({
-                success: true,
-                message: `please check your email:- ${user.email} to active your account`
-            })
-        } catch (error) {
-            return next(new ErrorHandler(error.message, 500));
+    resp.status(201).json({
+      success: true,
+      message: `Please check your email (${user.email}) to activate your account.`,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+// router.post("/create-user",upload.single("file"), async (req,res,next)=>{
+
+//     const filename = req?.file?.filename;
+//     console.log(filename);
+//     const {name,email,password} = req.body;
+//     const userEmail = await User.findOne({email});
+
+//     if (userEmail) {
+//         const filename = req.file.filename;
+//         const filePath = path.join(__dirname, `../uploads/${filename}`);
+//         fs.unlink(filePath, (err) => {
+//             if (err) {
+//                 console.log(err);
+//                 res.status(500).json({ message: "Error deleting file" })
+//             }
+
+//         });
+//         return next(new ErrorHandler("user already exist", 400));
+//     }
+   
+//     // // const fileUrl = path.join(filename);
+//     // const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
+//     // console.log(fileUrl)
+
+//     const myCloud = await cloudinary.v2.uploader.upload(avatar, {
+//         folder: "avatars",
+//     })
+
+
+//     const user = {
+//         name: name,
+//         email: email,
+//         password: password,
+//         avatar: {
+//           public_id: myCloud.public_id,
+//           url: myCloud.secure_url,
+//         },
+//     //     avatar:{
+//     //         url:fileUrl
+//     // }
+//   }
+
+//     const activationToken = createActivationToken(user);
+
+//         const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+
+//         try {
+//             await sendMail({
+//                 email: user.email,
+//                 subject:"Activate your account",
+//                 message:`Hello ${user.name}, Please click on the link to activate your account: ${activationUrl}`,
+//             })
+//             res.status(201).json({
+//                 success: true,
+//                 message: `please check your email:- ${user.email} to active your account`
+//             })
+//         } catch (error) {
+//             return next(new ErrorHandler(error.message, 500));
          
-        }
-        });
+//         }
+//         });
 
 
 // CREATE ACTIVATION TOKEN
