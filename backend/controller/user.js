@@ -14,7 +14,9 @@ const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const { upload } = require("../multer");
 const cloudinary = require("../config/cloudinary"); // ✅ now correct
 
-router.post("/create-user", upload.single("file"), async (req, resp, next) => {
+
+// CREATE USER
+router.post("/create-user", upload.single("file"), async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -26,6 +28,14 @@ router.post("/create-user", upload.single("file"), async (req, resp, next) => {
       return next(new ErrorHandler("No file uploaded", 400));
     }
 
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      // Clean up Cloudinary upload
+      await cloudinary.uploader.destroy(req.file.filename, { resource_type: "image" }).catch(console.error);
+      return next(new ErrorHandler("User already exists", 400));
+    }
+
     // Convert file buffer to base64
     const base64 = req.file.buffer.toString("base64");
     const dataUri = `data:${req.file.mimetype};base64,${base64}`;
@@ -33,9 +43,10 @@ router.post("/create-user", upload.single("file"), async (req, resp, next) => {
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(dataUri, {
       folder: "avatars",
+      resource_type: "image",
     });
 
-    const user = {
+    const userData = {
       name,
       email,
       password,
@@ -45,93 +56,119 @@ router.post("/create-user", upload.single("file"), async (req, resp, next) => {
       },
     };
 
-    const activationToken = createActivationToken(user);
+    const activationToken = createActivationToken(userData);
     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
 
     await sendMail({
-      email: user.email,
+      email: userData.email,
       subject: "Activate your account",
-      message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
+      message: `Hello ${userData.name}, please click the link to activate your account: ${activationUrl}`,
     });
 
-    resp.status(201).json({
+    res.status(201).json({
       success: true,
-      message: `Please check your email (${user.email}) to activate your account.`,
+      message: `Please check your email (${userData.email}) to activate your account.`,
     });
   } catch (error) {
+    // Clean up Cloudinary on error
+    if (req.file && req.file.filename) {
+      await cloudinary.uploader.destroy(req.file.filename, { resource_type: "image" }).catch(console.error);
+    }
     return next(new ErrorHandler(error.message, 500));
   }
 });
 
+// CREATE ACTIVATION TOKEN
+const createActivationToken = (user) => {
+  return jwt.sign(
+    {
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      avatar: user.avatar,
+    },
+    process.env.ACTIVATION_SECRET,
+    {
+      expiresIn: "2h",
+    }
+  );
+};
+
+// ACTIVATE USER (Changed to GET for email link compatibility)
+router.get(
+  "/activation/:activation_token",
+  catchAsyncError(async (req, res, next) => {
+    try {
+      const { activation_token } = req.params;
+      console.log("Token received:", activation_token);
+
+      const newUser = jwt.verify(activation_token, process.env.ACTIVATION_SECRET);
+      console.log("Decoded activation token:", newUser);
+
+      const { name, email, password, avatar } = newUser;
+
+      let user = await User.findOne({ email });
+      if (user) {
+        return next(new ErrorHandler("User already exists", 400));
+      }
+
+      user = await User.create({
+        name,
+        email,
+        password, // Will be hashed by schema's pre-save hook
+        avatar,
+      });
+
+      sendToken(user, 201, res);
+    } catch (error) {
+      if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+        return next(new ErrorHandler("Invalid or expired token", 400));
+      }
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
 
 
 
 
+
+
+
+// // create user
 // router.post("/create-user", upload.single("file"), async (req, resp, next) => {
 //   try {
-//     console.log("REQ.BODY:", req.body);
-//     console.log("REQ.FILE:", req.file);
-//     const filename = req.file?.filename;
-//     console.log("upload file", filename);
-
 //     const { name, email, password } = req.body;
-//     const userEmail = await User.findOne({ email });
 
-//     if (userEmail) {
-//       const filename = req.file?.filename;
-
-//       if (filename) {
-//         const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
-//           req.file.filename
-//         }`;
-
-//         try {
-//           // Try to delete the uploaded file
-//           await fs.promises.unlink(filePath);
-//           console.log(`✅ Deleted file: ${filename}`);
-//         } catch (err) {
-//           console.error(`⚠️ Failed to delete file (${filename}):`, err.message);
-//         }
-//       } else {
-//         console.warn("⚠️ No file found to delete.");
-//       }
-
-//       return next(new ErrorHandler("User already exists", 400));
+//     if (!name || !email || !password) {
+//       return next(new ErrorHandler("Please provide all fields", 400));
 //     }
 
-//     // const fileUrl = path.join("uploads", req.file.filename);
-    
+//     if (!req.file) {
+//       return next(new ErrorHandler("No file uploaded", 400));
+//     }
 
-//     // const user = {
-//     //   name,
-//     //   email,
-//     //   password,
-//     //   avatar: {
-//     //     url: fileUrl,
-//     //   },
-//     // };
-    
-//      const myCloud = await cloudinary.v2.uploader.upload(avatar, {
-//         folder: "avatars",
-//     })
+//     // Convert file buffer to base64
+//     const base64 = req.file.buffer.toString("base64");
+//     const dataUri = `data:${req.file.mimetype};base64,${base64}`;
 
+//     // Upload to Cloudinary
+//     const result = await cloudinary.uploader.upload(dataUri, {
+//       folder: "avatars",
+//     });
 
 //     const user = {
-//         name: name,
-//         email: email,
-//         password: password,
-//         avatar: {
-//           // public_id: myCloud.public_id,
-//           url: myCloud.secure_url,
-//         },
-//     //     avatar:{
-//     //         url:fileUrl
-//     // }
-//   }
+//       name,
+//       email,
+//       password,
+//       avatar: {
+//         public_id: result.public_id,
+//         url: result.secure_url,
+//       },
+//     };
 
 //     const activationToken = createActivationToken(user);
 //     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
-    
 
 //     await sendMail({
 //       email: user.email,
@@ -148,64 +185,145 @@ router.post("/create-user", upload.single("file"), async (req, resp, next) => {
 //   }
 // });
 
+// // router.post("/create-user", upload.single("file"), async (req, resp, next) => {
+// //   try {
+// //     console.log("REQ.BODY:", req.body);
+// //     console.log("REQ.FILE:", req.file);
+// //     const filename = req.file?.filename;
+// //     console.log("upload file", filename);
+
+// //     const { name, email, password } = req.body;
+// //     const userEmail = await User.findOne({ email });
+
+// //     if (userEmail) {
+// //       const filename = req.file?.filename;
+
+// //       if (filename) {
+// //         const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
+// //           req.file.filename
+// //         }`;
+
+// //         try {
+// //           // Try to delete the uploaded file
+// //           await fs.promises.unlink(filePath);
+// //           console.log(`✅ Deleted file: ${filename}`);
+// //         } catch (err) {
+// //           console.error(`⚠️ Failed to delete file (${filename}):`, err.message);
+// //         }
+// //       } else {
+// //         console.warn("⚠️ No file found to delete.");
+// //       }
+
+// //       return next(new ErrorHandler("User already exists", 400));
+// //     }
+
+// //     // const fileUrl = path.join("uploads", req.file.filename);
+    
+
+// //     // const user = {
+// //     //   name,
+// //     //   email,
+// //     //   password,
+// //     //   avatar: {
+// //     //     url: fileUrl,
+// //     //   },
+// //     // };
+    
+// //      const myCloud = await cloudinary.v2.uploader.upload(avatar, {
+// //         folder: "avatars",
+// //     })
 
 
-// CREATE ACTIVATION TOKEN
+// //     const user = {
+// //         name: name,
+// //         email: email,
+// //         password: password,
+// //         avatar: {
+// //           // public_id: myCloud.public_id,
+// //           url: myCloud.secure_url,
+// //         },
+// //     //     avatar:{
+// //     //         url:fileUrl
+// //     // }
+// //   }
+
+// //     const activationToken = createActivationToken(user);
+// //     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+    
+
+// //     await sendMail({
+// //       email: user.email,
+// //       subject: "Activate your account",
+// //       message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
+// //     });
+
+// //     resp.status(201).json({
+// //       success: true,
+// //       message: `Please check your email (${user.email}) to activate your account.`,
+// //     });
+// //   } catch (error) {
+// //     return next(new ErrorHandler(error.message, 500));
+// //   }
+// // });
 
 
-const createActivationToken = (user) => {
-  return jwt.sign(
-    {
-      name: user.name,
-      email: user.email,
-      password: user.password,
-      avatar: user.avatar,
-    },
-    process.env.ACTIVATION_SECRET,
-    {
-      expiresIn: "2h",
-    }
-  );
-};
 
-// ACTIVATE OUR USER
+// // CREATE ACTIVATION TOKEN
 
-router.post(
-  "/activation",
-  catchAsyncError(async (req, resp, next) => {
-    const { activation_token } = req.body;
 
-    const newUser = jwt.verify(activation_token, process.env.ACTIVATION_SECRET);
-    console.log("Decoded token:", newUser);
+// const createActivationToken = (user) => {
+//   return jwt.sign(
+//     {
+//       name: user.name,
+//       email: user.email,
+//       password: user.password,
+//       avatar: user.avatar,
+//     },
+//     process.env.ACTIVATION_SECRET,
+//     {
+//       expiresIn: "2h",
+//     }
+//   );
+// };
 
-    try {
-      const newUser = jwt.verify(
-        activation_token,
-        process.env.ACTIVATION_SECRET
-      );
-      if (!newUser) {
-        return next(new ErrorHandler("Invalid Token"));
-      }
-      const { name, email, password, avatar } = newUser;
-      let user = await User.findOne({ email });
-      if (user) {
-        return next(new ErrorHandler("user already exists", 400));
-      }
+// // ACTIVATE OUR USER
 
-      user = await User.create({
-        name,
-        email,
-        avatar,
-        password,
-      });
-      sendToken(user, 201, resp);
-    } catch (error) {
-      return next(new ErrorHandler(error.message, 500));
-    }
-    console.log("Decoded activation token:", newUser);
-    console.log("Token received:", activation_token);
-  })
-);
+// router.post(
+//   "/activation",
+//   catchAsyncError(async (req, resp, next) => {
+//     const { activation_token } = req.body;
+
+//     const newUser = jwt.verify(activation_token, process.env.ACTIVATION_SECRET);
+//     console.log("Decoded token:", newUser);
+
+//     try {
+//       const newUser = jwt.verify(
+//         activation_token,
+//         process.env.ACTIVATION_SECRET
+//       );
+//       if (!newUser) {
+//         return next(new ErrorHandler("Invalid Token"));
+//       }
+//       const { name, email, password, avatar } = newUser;
+//       let user = await User.findOne({ email });
+//       if (user) {
+//         return next(new ErrorHandler("user already exists", 400));
+//       }
+
+//       user = await User.create({
+//         name,
+//         email,
+//         avatar,
+//         password,
+//       });
+//       sendToken(user, 201, resp);
+//     } catch (error) {
+//       return next(new ErrorHandler(error.message, 500));
+//     }
+//     console.log("Decoded activation token:", newUser);
+//     console.log("Token received:", activation_token);
+//   })
+// );
 
 // LOGIN USER
 
