@@ -14,24 +14,33 @@ const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // CREATE USER
-router.post("/create-user", async (req, res, next) => {
 
+// CREATE USER
+router.post("/create-user", upload.single("avatarUrl"), async (req, res, next) => {
   try {
-    const { name, email, password, avatarUrl } = req.body;
+    const { name, email, password } = req.body;
 
-    // find user email 
+    if (!name || !email || !password) {
+      return next(new ErrorHandler("Please provide all fields", 400));
+    }
+
+    // get uploaded file path
+    const avatarUrl = req.file ? `/uploads/${req.file.filename}` : "";
+
+    // check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return next(new ErrorHandler("User already exists", 400));
     }
 
-    const user = { name, email, password, avatar: { url: avatarUrl || "" } };
-    if (!name || !email || !password) {
-      return next(new ErrorHandler("Please provide all fields", 400));
-    }
+    // build user object
+    const user = { name, email, password, avatar: { url: avatarUrl } };
+
+    // create activation token
     const activationToken = createActivationToken(user);
     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
 
+    // send email
     await sendMail({
       email: user.email,
       subject: "Activate your account",
@@ -46,6 +55,40 @@ router.post("/create-user", async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
+
+// router.post("/create-user", async (req, res, next) => {
+
+//   try {
+//     const { name, email, password, avatarUrl } = req.body;
+
+//     // find user email 
+//     const userExists = await User.findOne({ email });
+//     if (userExists) {
+//       return next(new ErrorHandler("User already exists", 400));
+//     }
+
+//     const user = { name, email, password, avatar: { url: avatarUrl || "" } };
+//     if (!name || !email || !password) {
+//       return next(new ErrorHandler("Please provide all fields", 400));
+//     }
+//     const activationToken = createActivationToken(user);
+//     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
+
+//     await sendMail({
+//       email: user.email,
+//       subject: "Activate your account",
+//       message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: `Please check your email (${user.email}) to activate your account.`,
+//     });
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 
 // CREATE ACTIVATION TOKEN
 
