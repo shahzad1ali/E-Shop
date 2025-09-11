@@ -23,8 +23,8 @@ app.use(
 
 // ✅ Serve uploads folder correctly (outside backend)
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
-app.use("/test", (req, res) => {
-  res.send("Backend Api Test!");
+app.use("/test", (req,res) => {
+  res.send("backend Api");
 });
 
 

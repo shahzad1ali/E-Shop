@@ -13,8 +13,6 @@
 //     }
 
 //     cb(null, uploadPath);
-
-//     // add filename to the callback
 //   },
 //   filename: function (req, file, cb) {
 //     const uniqueSuffix = Date.now() + "_" + Math.round(Math.random() * 1e9);
@@ -29,7 +27,6 @@
 
 const multer = require("multer");
 
-const storage = multer.memoryStorage(); // ✅ store in memory instead of disk
+const storage = multer.memoryStorage();
 
 exports.upload = multer({ storage });
-
