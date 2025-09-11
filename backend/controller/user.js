@@ -1,22 +1,32 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const path = require("path");
-const fs = require("fs");
-const { upload } = require("../multer");
-
+const { upload } = require("../multer"); // make sure multer uses memoryStorage
+const cloudinary = require("cloudinary").v2;
 
 const catchAsyncError = require("../middleware/catchAsyncError");
 const sendToken = require("../utils/jwtToken");
 const User = require("../model/user");
 const ErrorHandler = require("../utils/ErrorHandler");
 const sendMail = require("../utils/sendMail");
-const { isAuthenticated, isAdmin } = require("../middleware/auth");
+
 const router = express.Router();
 
-// CREATE USER
+// 🔑 Create activation token
+const createActivationToken = (user) => {
+  return jwt.sign(
+    {
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      avatar: user.avatar,
+    },
+    process.env.ACTIVATION_SECRET,
+    { expiresIn: "4h" }
+  );
+};
 
-// CREATE USER
-router.post("/create-user", upload.single("avatarUrl"), async (req, res, next) => {
+// 📌 CREATE USER (Signup Request)
+router.post("/create-user", upload.single("file"), async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -24,17 +34,34 @@ router.post("/create-user", upload.single("avatarUrl"), async (req, res, next) =
       return next(new ErrorHandler("Please provide all fields", 400));
     }
 
-    // get uploaded file path
-    const avatarUrl = req.file ? `/uploads/${req.file.filename}` : "";
-
     // check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return next(new ErrorHandler("User already exists", 400));
     }
 
-    // build user object
-    const user = { name, email, password, avatar: { url: avatarUrl } };
+    // avatar upload to Cloudinary
+    let avatar = { url: "" };
+    if (req.file) {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "avatars" },
+          (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+
+      avatar = {
+        public_id: uploadResult.public_id,
+        url: uploadResult.secure_url,
+      };
+    }
+
+    // build temp user object for token
+    const user = { name, email, password, avatar };
 
     // create activation token
     const activationToken = createActivationToken(user);
@@ -52,73 +79,27 @@ router.post("/create-user", upload.single("avatarUrl"), async (req, res, next) =
       message: `Please check your email (${user.email}) to activate your account.`,
     });
   } catch (error) {
+    console.error("Create-user error:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
 
-
-// router.post("/create-user", async (req, res, next) => {
-
-//   try {
-//     const { name, email, password, avatarUrl } = req.body;
-
-//     // find user email 
-//     const userExists = await User.findOne({ email });
-//     if (userExists) {
-//       return next(new ErrorHandler("User already exists", 400));
-//     }
-
-//     const user = { name, email, password, avatar: { url: avatarUrl || "" } };
-//     if (!name || !email || !password) {
-//       return next(new ErrorHandler("Please provide all fields", 400));
-//     }
-//     const activationToken = createActivationToken(user);
-//     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
-
-//     await sendMail({
-//       email: user.email,
-//       subject: "Activate your account",
-//       message: `Hello ${user.name}, please click the link to activate your account: ${activationUrl}`,
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: `Please check your email (${user.email}) to activate your account.`,
-//     });
-//   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
-
-// CREATE ACTIVATION TOKEN
-
-const createActivationToken = (user) => {
-  return jwt.sign(
-    {
-      name: user.name,
-      email: user.email,
-      password: user.password,
-      avatar: user.avatar,
-    },
-    process.env.ACTIVATION_SECRET,
-    { expiresIn: "4h" }
-  );
-};
-
-// ACTIVATE USER
+// 📌 ACTIVATE USER
 router.post(
   "/activation",
   catchAsyncError(async (req, res, next) => {
     try {
       const { activation_token } = req.body;
-      const decoded = jwt.verify(
-        activation_token,
-        process.env.ACTIVATION_SECRET
-      );
+      if (!activation_token) {
+        return next(new ErrorHandler("No activation token provided", 400));
+      }
+
+      const decoded = jwt.verify(activation_token, process.env.ACTIVATION_SECRET);
 
       let user = await User.findOne({ email: decoded.email });
       if (user) return next(new ErrorHandler("User already exists", 400));
 
+      // create user in DB (password will be hashed by schema middleware)
       user = await User.create({
         name: decoded.name,
         email: decoded.email,
@@ -128,11 +109,11 @@ router.post(
 
       sendToken(user, 201, res);
     } catch (error) {
+      console.error("Activation error:", error);
       return next(new ErrorHandler(error.message, 500));
     }
   })
 );
-
 // LOGIN
 router.post(
   "/login-user",
