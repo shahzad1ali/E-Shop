@@ -15,15 +15,20 @@ const router = express.Router();
 
 // CREATE USER
 router.post("/create-user", async (req, res, next) => {
+
   try {
     const { name, email, password, avatarUrl } = req.body;
 
+    // find user email 
     const userExists = await User.findOne({ email });
     if (userExists) {
       return next(new ErrorHandler("User already exists", 400));
     }
 
     const user = { name, email, password, avatar: { url: avatarUrl || "" } };
+    if (!name || !email || !password) {
+      return next(new ErrorHandler("Please provide all fields", 400));
+    }
     const activationToken = createActivationToken(user);
     const activationUrl = `https://e-shop-62ai.vercel.app/activation/${activationToken}`;
 
@@ -43,6 +48,7 @@ router.post("/create-user", async (req, res, next) => {
 });
 
 // CREATE ACTIVATION TOKEN
+
 const createActivationToken = (user) => {
   return jwt.sign(
     {
@@ -52,7 +58,7 @@ const createActivationToken = (user) => {
       avatar: user.avatar,
     },
     process.env.ACTIVATION_SECRET,
-    { expiresIn: "2h" }
+    { expiresIn: "4h" }
   );
 };
 
